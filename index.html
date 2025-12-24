@@ -1051,7 +1051,8 @@
         const SUPABASE_URL = 'https://egatysvguaxvohblgqbu.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnYXR5c3ZndWF4dm9oYmxncWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5MDYzNzAsImV4cCI6MjA3ODQ4MjM3MH0.SEQ4XyzMCAHBZVHBn_qOWf5fqtYAqkeWBwHz92Ngs90';
 
-        let supabase = null;
+        // Variáveis globais - DECLARADAS UMA ÚNICA VEZ
+        let supabaseClient = null;
         let usuarioAtual = null;
         let pontoEditandoId = null;
         let dadosRelatorio = null;
@@ -1061,19 +1062,26 @@
         // INICIALIZAÇÃO
         // ========================================
         async function init() {
+            console.log('🚀 Iniciando aplicação...');
+            
             try {
+                // Inicia o relógio PRIMEIRO (independente do Supabase)
                 atualizarRelogio();
                 setInterval(atualizarRelogio, 1000);
+                console.log('✅ Relógio iniciado');
                 
-                if (SUPABASE_URL === 'SUA_URL_AQUI' || SUPABASE_KEY === 'SUA_CHAVE_AQUI') {
-                    mostrarErroConfiguracao();
-                    return;
+                // Tenta conectar ao Supabase
+                if (typeof window.supabase === 'undefined') {
+                    throw new Error('Biblioteca Supabase não carregada');
                 }
-
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                console.log('✅ Supabase conectado');
+                
+                // Carrega usuário
                 await carregarUsuario();
                 
+                // Configura data
                 const hoje = new Date();
                 const ano = hoje.getFullYear();
                 const mes = String(hoje.getMonth() + 1).padStart(2, '0');
@@ -1088,44 +1096,20 @@
                 document.getElementById('reportStartDate').value = dataInicio;
                 document.getElementById('reportEndDate').value = dataHoje;
                 
+                // Carrega pontos
                 await carregarPontosDeHoje();
                 
+                // Event listener para mudança de data
                 document.getElementById('selectedDate').addEventListener('change', function() {
                     carregarPontosDeHoje();
                 });
                 
+                console.log('✅ Aplicação iniciada com sucesso');
+                
             } catch (error) {
-                console.error('Erro na inicialização:', error);
+                console.error('❌ Erro na inicialização:', error);
                 mostrarErroGeral(error.message);
             }
-        }
-
-        function mostrarErroConfiguracao() {
-            const container = document.querySelector('.app-container');
-            container.innerHTML = `
-                <div style="background: #1a1a1a; min-height: 100vh; padding: 40px; text-align: center;">
-                    <div style="max-width: 500px; margin: 0 auto;">
-                        <div style="font-size: 4em; margin-bottom: 20px;">⚠️</div>
-                        <h1 style="color: #FF6B35; margin-bottom: 20px; font-size: 2em;">
-                            Configuração Necessária
-                        </h1>
-                        <div style="background: rgba(255, 107, 53, 0.1); border: 2px solid #FF6B35; border-radius: 15px; padding: 30px; color: white;">
-                            <p style="font-size: 1.1em; margin-bottom: 20px;">
-                                Para usar o sistema, você precisa configurar suas credenciais do Supabase:
-                            </p>
-                            <ol style="text-align: left; line-height: 2; font-size: 1em;">
-                                <li>Abra o arquivo HTML em um editor de texto</li>
-                                <li>Localize as linhas com <code style="background: #2d2d2d; padding: 2px 8px; border-radius: 4px; color: #FF6B35;">SUPABASE_URL</code> e <code style="background: #2d2d2d; padding: 2px 8px; border-radius: 4px; color: #FF6B35;">SUPABASE_KEY</code></li>
-                                <li>Substitua por suas credenciais reais do Supabase</li>
-                                <li>Salve o arquivo e recarregue a página</li>
-                            </ol>
-                            <p style="margin-top: 20px; font-size: 0.9em; color: #FF8C42;">
-                                💡 Encontre suas credenciais em: Supabase → Settings → API
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            `;
         }
 
         function mostrarErroGeral(mensagem) {
@@ -1138,16 +1122,16 @@
 
         async function carregarUsuario() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('usuarios')
                     .select('*')
                     .eq('nome', 'Paulo Ricardo Pereira')
                     .single();
                 
                 if (error) {
-                    console.error('Erro detalhado:', error);
+                    console.warn('⚠️ Usuário específico não encontrado, buscando primeiro usuário...');
                     
-                    const { data: usuarios, error: error2 } = await supabase
+                    const { data: usuarios, error: error2 } = await supabaseClient
                         .from('usuarios')
                         .select('*')
                         .limit(1);
@@ -1160,7 +1144,7 @@
                         usuarioAtual = usuarios[0];
                         document.getElementById('userLocation').textContent = 
                             `${usuarios[0].nome} - ${usuarios[0].setor} - ${usuarios[0].empresa}`;
-                        console.warn('Usando primeiro usuário encontrado:', usuarios[0].nome);
+                        console.log('✅ Usando primeiro usuário:', usuarios[0].nome);
                     } else {
                         throw new Error('Nenhum usuário encontrado. Execute o script SQL primeiro.');
                     }
@@ -1171,9 +1155,10 @@
                     usuarioAtual = data;
                     document.getElementById('userLocation').textContent = 
                         `${data.nome} - ${data.setor} - ${data.empresa}`;
+                    console.log('✅ Usuário carregado:', data.nome);
                 }
             } catch (error) {
-                console.error('Erro ao carregar usuário:', error);
+                console.error('❌ Erro ao carregar usuário:', error);
                 document.getElementById('userLocation').innerHTML = 
                     `<span style="color: #f44336;">⚠️ ${error.message}</span>`;
             }
@@ -1220,7 +1205,7 @@
         // REGISTRAR PONTO
         // ========================================
         async function registrarPonto() {
-            if (!usuarioAtual || !supabase) {
+            if (!usuarioAtual || !supabaseClient) {
                 alert('Sistema não está pronto. Verifique as configurações.');
                 return;
             }
@@ -1235,7 +1220,7 @@
                 const agora = new Date();
                 const horaAtual = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
 
-                const { data: pontoExistente } = await supabase
+                const { data: pontoExistente } = await supabaseClient
                     .from('pontos')
                     .select('*')
                     .eq('usuario_id', usuarioAtual.id)
@@ -1273,12 +1258,12 @@
 
                 let result;
                 if (pontoExistente) {
-                    result = await supabase
+                    result = await supabaseClient
                         .from('pontos')
                         .update(pontoData)
                         .eq('id', pontoExistente.id);
                 } else {
-                    result = await supabase
+                    result = await supabaseClient
                         .from('pontos')
                         .insert([pontoData]);
                 }
@@ -1293,12 +1278,12 @@
         }
 
         async function carregarPontosDeHoje() {
-            if (!usuarioAtual || !supabase) return;
+            if (!usuarioAtual || !supabaseClient) return;
 
             try {
                 const data = document.getElementById('selectedDate').value;
                 
-                const { data: ponto, error } = await supabase
+                const { data: ponto, error } = await supabaseClient
                     .from('pontos')
                     .select('*')
                     .eq('usuario_id', usuarioAtual.id)
@@ -1396,7 +1381,7 @@
             pontoEditandoId = pontoId;
             
             try {
-                const { data: ponto, error } = await supabase
+                const { data: ponto, error } = await supabaseClient
                     .from('pontos')
                     .select('*')
                     .eq('id', pontoId)
@@ -1441,7 +1426,7 @@
                     updated_at: getTimestampBrasilia()
                 };
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('pontos')
                     .update(pontoData)
                     .eq('id', pontoEditandoId);
@@ -1462,7 +1447,7 @@
             if (!confirm('Deseja realmente excluir este ponto?')) return;
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('pontos')
                     .delete()
                     .eq('id', pontoEditandoId);
@@ -1504,7 +1489,7 @@
         }
 
         async function salvarFaltaModal() {
-            if (!usuarioAtual || !supabase) return;
+            if (!usuarioAtual || !supabaseClient) return;
 
             try {
                 const data = document.getElementById('modalFaltaData').value;
@@ -1516,7 +1501,7 @@
                     return;
                 }
 
-                const { data: existente } = await supabase
+                const { data: existente } = await supabaseClient
                     .from('pontos')
                     .select('id')
                     .eq('usuario_id', usuarioAtual.id)
@@ -1546,12 +1531,12 @@
 
                 let result;
                 if (existente) {
-                    result = await supabase
+                    result = await supabaseClient
                         .from('pontos')
                         .update(pontoData)
                         .eq('id', existente.id);
                 } else {
-                    result = await supabase
+                    result = await supabaseClient
                         .from('pontos')
                         .insert([pontoData]);
                 }
@@ -1580,7 +1565,7 @@
         // RELATÓRIO
         // ========================================
         async function gerarRelatorio() {
-            if (!usuarioAtual || !supabase) return;
+            if (!usuarioAtual || !supabaseClient) return;
 
             try {
                 const dataInicio = document.getElementById('reportStartDate').value;
@@ -1591,7 +1576,7 @@
                     return;
                 }
 
-                const { data: pontos, error: errorPontos } = await supabase
+                const { data: pontos, error: errorPontos } = await supabaseClient
                     .from('pontos')
                     .select('*')
                     .eq('usuario_id', usuarioAtual.id)
@@ -1604,7 +1589,7 @@
                 const hoje = new Date();
                 const dataHoje = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
                 
-                const { data: todosPontos, error: errorTodosPontos } = await supabase
+                const { data: todosPontos, error: errorTodosPontos } = await supabaseClient
                     .from('pontos')
                     .select('*')
                     .eq('usuario_id', usuarioAtual.id)
@@ -1620,7 +1605,6 @@
                 if (pontos) {
                     pontos.forEach(ponto => {
                         const minutosReais = calcularMinutosTrabalhados(ponto);
-                        const minutosParaBanco = calcularMinutosParaBanco(minutosReais);
                         
                         totalMinutosTrabalhados += minutosReais;
                         
@@ -1640,14 +1624,10 @@
 
                 let bancoHorasExtras = 0;
                 let bancoHorasDevendo = 0;
-                let totalMinutosBanco = 0;
 
                 if (todosPontos) {
                     todosPontos.forEach(ponto => {
                         const minutosReais = calcularMinutosTrabalhados(ponto);
-                        const minutosParaBanco = calcularMinutosParaBanco(minutosReais);
-                        
-                        totalMinutosBanco += minutosReais;
                         
                         if (minutosReais > 490) {
                             bancoHorasExtras += (minutosReais - CARGA_HORARIA_DIARIA);
@@ -1784,7 +1764,7 @@
         }
 
         // ========================================
-        // FUNÇÕES DE PDF CORRIGIDAS - AGORA COM TODAS AS 4 ENTRADAS E SAÍDAS
+        // FUNÇÕES DE PDF
         // ========================================
         function adicionarResumo(doc, startY, totalMinutosConsiderados) {
             doc.setFontSize(13);
@@ -2153,6 +2133,7 @@
             return dataHoraBrasilia.toISOString();
         }
 
+        // Inicia a aplicação quando a página carrega
         window.onload = init;
     </script>
 </body>
