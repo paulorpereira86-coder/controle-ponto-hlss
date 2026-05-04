@@ -1,0 +1,2150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Ponto - Hospitalar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            min-height: 100vh;
+            box-shadow: 0 0 30px rgba(255, 107, 53, 0.3);
+        }
+
+        /* Header - Relógio */
+        .header {
+            background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+        }
+
+        .time-display {
+            font-size: 2.5em;
+            font-weight: bold;
+            letter-spacing: 3px;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            margin-bottom: 5px;
+        }
+
+        .date-display {
+            font-size: 0.85em;
+            opacity: 0.95;
+        }
+
+        /* Contador de horas trabalhadas */
+        .hours-counter {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: white;
+            padding: 25px 20px;
+            text-align: center;
+            border-bottom: 3px solid #FF6B35;
+        }
+
+        .hours-label {
+            font-size: 0.95em;
+            margin-bottom: 10px;
+            color: #FF6B35;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .hours-value {
+            font-size: 3em;
+            font-weight: bold;
+            letter-spacing: 3px;
+            color: #FF6B35;
+            text-shadow: 0 0 20px rgba(255, 107, 53, 0.5);
+        }
+
+        /* Data Selector */
+        .date-selector {
+            padding: 15px 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #3d3d3d;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .date-selector label {
+            font-weight: 600;
+            color: #FF6B35;
+            white-space: nowrap;
+            font-size: 0.95em;
+        }
+
+        .date-selector input,
+        .date-selector select {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #FF6B35;
+            border-radius: 10px;
+            font-size: 0.95em;
+            background: #2d2d2d;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .date-selector input:hover,
+        .date-selector select:hover {
+            border-color: #FF8C42;
+            box-shadow: 0 0 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .date-selector input:focus,
+        .date-selector select:focus {
+            outline: none;
+            border-color: #FF8C42;
+            box-shadow: 0 0 20px rgba(255, 107, 53, 0.5);
+        }
+
+        /* Botão de registrar - REDONDO */
+        .register-button-container {
+            padding: 20px;
+            text-align: center;
+            background: #2d2d2d;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .register-btn {
+            background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+            color: #FF6B35;
+            border: 3px solid #FF6B35;
+            padding: 0;
+            font-size: 1em;
+            font-weight: bold;
+            border-radius: 50%;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            width: 140px;
+            height: 140px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .register-btn:before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: #FF6B35;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .register-btn:hover:before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .register-btn:hover {
+            color: #1a1a1a;
+            border-color: #FF8C42;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.6);
+        }
+
+        .register-btn span {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            line-height: 1.3;
+            padding: 10px;
+        }
+
+        /* Botão de falta/atestado - REDONDO */
+        .falta-btn {
+            background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+            color: #f44336;
+            border: 3px solid #f44336;
+        }
+
+        .falta-btn:before {
+            background: #f44336;
+        }
+
+        .falta-btn:hover {
+            border-color: #d32f2f;
+            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.6);
+        }
+
+        /* Local info */
+        .location-info {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        .location-icon {
+            color: #FF6B35;
+            font-size: 1.2em;
+        }
+
+        .location-text {
+            color: #ccc;
+            font-size: 0.85em;
+        }
+
+        /* Lista de pontos registrados */
+        .points-list {
+            padding: 20px;
+            background: #2d2d2d;
+        }
+
+        .point-item {
+            background: #1a1a1a;
+            border: 2px solid #3d3d3d;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+
+        .point-item:hover {
+            border-color: #FF6B35;
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .point-check {
+            color: #4CAF50;
+            font-size: 1.8em;
+            text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .point-info {
+            flex: 1;
+        }
+
+        .point-type {
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.95em;
+            margin-bottom: 5px;
+        }
+
+        .point-time {
+            color: #FF6B35;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .point-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .icon-btn {
+            background: #3d3d3d;
+            border: 2px solid #FF6B35;
+            font-size: 1.1em;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: all 0.3s;
+            color: #FF6B35;
+        }
+
+        .icon-btn:hover {
+            background: #FF6B35;
+            color: #1a1a1a;
+            transform: scale(1.1);
+        }
+
+        /* Menu inferior */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 500px;
+            width: 100%;
+            background: #1a1a1a;
+            border-top: 3px solid #FF6B35;
+            display: flex;
+            box-shadow: 0 -4px 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .nav-item {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            transition: all 0.3s;
+            color: #888;
+            border-right: 1px solid #3d3d3d;
+        }
+
+        .nav-item:last-child {
+            border-right: none;
+        }
+
+        .nav-item:hover {
+            background: #2d2d2d;
+            color: #FF6B35;
+        }
+
+        .nav-item.active {
+            color: #FF6B35;
+            background: #2d2d2d;
+            box-shadow: inset 0 3px 0 #FF6B35;
+        }
+
+        .nav-icon {
+            font-size: 1.3em;
+            margin-bottom: 3px;
+        }
+
+        .nav-label {
+            font-size: 0.7em;
+            display: block;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Telas */
+        .screen {
+            display: none;
+            padding-bottom: 80px;
+            min-height: 100vh;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* Tela de relatório */
+        .report-header {
+            background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+            color: white;
+            padding: 25px 20px;
+            text-align: center;
+            border-bottom: 3px solid #FF6B35;
+        }
+
+        .report-title {
+            font-size: 1.5em;
+            margin-bottom: 8px;
+            color: #FF6B35;
+        }
+
+        .report-icon {
+            font-size: 1.8em;
+            margin-top: 8px;
+        }
+
+        .report-filters {
+            padding: 20px;
+            background: #2d2d2d;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .filter-row input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #FF6B35;
+            border-radius: 10px;
+            font-size: 0.95em;
+            background: #1a1a1a;
+            color: white;
+        }
+
+        .filter-btn {
+            background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+            transition: all 0.3s;
+        }
+
+        .filter-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.6);
+        }
+
+        /* RESUMO COMPACTO */
+        .summary-card {
+            background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+            color: white;
+            margin: 15px;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.3);
+            border: 2px solid #FF6B35;
+        }
+
+        .summary-title {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: #FF6B35;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .summary-item {
+            background: rgba(255, 107, 53, 0.1);
+            padding: 12px 8px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 107, 53, 0.3);
+            transition: all 0.3s;
+        }
+
+        .summary-item:hover {
+            background: rgba(255, 107, 53, 0.2);
+            border-color: #FF6B35;
+            transform: scale(1.02);
+        }
+
+        .summary-item-label {
+            font-size: 0.7em;
+            color: #FF8C42;
+            margin-bottom: 5px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .summary-item-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: white;
+        }
+
+        /* BANCO DE HORAS - DESTAQUE */
+        .banco-horas-destaque {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 12px;
+            border: 2px solid #FF6B35;
+        }
+
+        .banco-horas-label {
+            text-align: center;
+            font-size: 0.75em;
+            margin-bottom: 5px;
+            opacity: 0.9;
+            color: #FF8C42;
+        }
+
+        .banco-horas-value {
+            text-align: center;
+            font-size: 2em;
+            font-weight: bold;
+            color: #FF6B35;
+        }
+
+        .banco-horas-status {
+            text-align: center;
+            font-size: 0.7em;
+            margin-top: 8px;
+            opacity: 0.8;
+        }
+
+        .banco-horas-calc {
+            text-align: center;
+            font-size: 0.65em;
+            margin-top: 5px;
+            opacity: 0.6;
+            color: #999;
+        }
+
+        .pdf-btn {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            width: calc(100% - 30px);
+            margin: 0 15px 15px;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+            transition: all 0.3s;
+        }
+
+        .pdf-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+        }
+
+        /* Tela de ajustes */
+        .adjustment-form {
+            padding: 20px;
+            background: #2d2d2d;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #FF6B35;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #FF6B35;
+            border-radius: 10px;
+            font-size: 0.95em;
+            font-family: inherit;
+            background: #1a1a1a;
+            color: white;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #FF8C42;
+            box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-group small {
+            color: #999;
+            font-size: 0.8em;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .save-btn {
+            background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+            transition: all 0.3s;
+        }
+
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.6);
+        }
+
+        .adjustment-list {
+            padding: 20px;
+            background: #2d2d2d;
+        }
+
+        .adjustment-list h3 {
+            color: #FF6B35;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 1em;
+        }
+
+        .adjustment-item {
+            background: #1a1a1a;
+            border: 2px solid #3d3d3d;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+
+        .adjustment-item:hover {
+            border-color: #FF6B35;
+            box-shadow: 0 5px 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .adjustment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .adjustment-value {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        .adjustment-value.positive {
+            color: #4CAF50;
+        }
+
+        .adjustment-value.negative {
+            color: #f44336;
+        }
+
+        .adjustment-date {
+            font-size: 0.8em;
+            color: #999;
+            margin-top: 3px;
+        }
+
+        .adjustment-desc {
+            background: #2d2d2d;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            color: #ccc;
+            border-left: 3px solid #FF6B35;
+        }
+
+        /* Modal de edição */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #2d2d2d;
+            border-radius: 15px;
+            max-width: 450px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 2px solid #FF6B35;
+            box-shadow: 0 10px 40px rgba(255, 107, 53, 0.5);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 13px 13px 0 0;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.3em;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-time-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            padding: 20px;
+            border-top: 1px solid #3d3d3d;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            transition: all 0.3s;
+        }
+
+        .modal-btn-save {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .modal-btn-save:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .modal-btn-cancel {
+            background: #777;
+            color: white;
+        }
+
+        .modal-btn-cancel:hover {
+            background: #666;
+        }
+
+        .modal-btn-delete {
+            background: #f44336;
+            color: white;
+        }
+
+        .modal-btn-delete:hover {
+            background: #da190b;
+        }
+
+        /* Alertas */
+        .alert {
+            padding: 12px;
+            border-radius: 10px;
+            margin: 15px 20px;
+            font-weight: 500;
+            border-left: 4px solid;
+            font-size: 0.9em;
+        }
+
+        .alert-success {
+            background: rgba(76, 175, 80, 0.1);
+            color: #4CAF50;
+            border-color: #4CAF50;
+        }
+
+        .alert-error {
+            background: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+            border-color: #f44336;
+        }
+
+        .alert-warning {
+            background: rgba(255, 152, 0, 0.1);
+            color: #ff9800;
+            border-color: #ff9800;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 12px;
+            opacity: 0.3;
+        }
+
+        /* Scrollbar customizada */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #FF6B35;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FF8C42;
+        }
+
+        /* Responsivo */
+        @media (max-width: 480px) {
+            .time-display {
+                font-size: 2.2em;
+                letter-spacing: 2px;
+            }
+            
+            .hours-value {
+                font-size: 2.5em;
+                letter-spacing: 2px;
+            }
+
+            .register-btn {
+                width: 120px;
+                height: 120px;
+                font-size: 0.9em;
+            }
+
+            .modal-time-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-item-value {
+                font-size: 1.1em;
+            }
+
+            .banco-horas-value {
+                font-size: 1.6em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- TELA PRINCIPAL: REGISTRAR PONTO -->
+        <div id="home-screen" class="screen active">
+            <div class="header">
+                <div class="time-display" id="timeDisplay">00:00:00</div>
+                <div class="date-display" id="dateDisplay">--</div>
+            </div>
+
+            <div class="hours-counter">
+                <div class="hours-label">Horas trabalhadas hoje</div>
+                <div class="hours-value" id="hoursWorked">00:00:00</div>
+            </div>
+
+            <div class="date-selector">
+                <label>📅 Data:</label>
+                <input type="date" id="selectedDate">
+            </div>
+
+            <div class="date-selector">
+                <label>⏱️ Carga:</label>
+                <select id="cargaHorariaDia">
+                    <option value="240">4h</option>
+                    <option value="300">5h</option>
+                    <option value="360">6h</option>
+                    <option value="480">8h</option>
+                </select>
+            </div>
+
+            <div class="register-button-container">
+                <button class="register-btn" onclick="registrarPonto()">
+                    <span>REGISTRAR<br>PONTO</span>
+                </button>
+                
+                <button class="register-btn falta-btn" onclick="abrirModalFalta()">
+                    <span>LANÇAR<br>FALTA/<br>ATESTADO</span>
+                </button>
+            </div>
+
+            <div class="location-info">
+                <span class="location-icon">📍</span>
+                <span class="location-text" id="userLocation">Carregando...</span>
+            </div>
+
+            <div class="points-list" id="todayPoints">
+                <div class="empty-state">
+                    <div class="empty-state-icon">⏱️</div>
+                    <div>Carregando pontos...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TELA DE RELATÓRIO -->
+        <div id="report-screen" class="screen">
+            <div class="report-header">
+                <div class="report-title">Relatório de Horas</div>
+                <div class="report-icon">📊</div>
+            </div>
+
+            <div class="report-filters">
+                <div class="filter-row">
+                    <input type="date" id="reportStartDate">
+                    <input type="date" id="reportEndDate">
+                </div>
+                <button class="filter-btn" onclick="gerarRelatorio()">🔍 Buscar</button>
+            </div>
+
+            <div id="reportSummary"></div>
+            
+            <button class="pdf-btn" onclick="visualizarPDF()" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" id="visualizarPdfBtn">
+                👁️ Visualizar PDF
+            </button>
+            
+            <button class="pdf-btn" onclick="exportarPDF()" style="display: none;" id="pdfBtn">
+                📄 Baixar PDF
+            </button>
+
+            <div id="reportDetails" class="points-list"></div>
+        </div>
+
+        <!-- MENU INFERIOR -->
+        <div class="bottom-nav">
+            <button class="nav-item active" onclick="switchScreen('home')">
+                <div class="nav-icon">🏠</div>
+                <span class="nav-label">Início</span>
+            </button>
+            <button class="nav-item" onclick="switchScreen('report')">
+                <div class="nav-icon">📊</div>
+                <span class="nav-label">Relatório</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL DE LANÇAR FALTA/ATESTADO -->
+    <div id="faltaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);">
+                <h2>⚠️ Lançar Falta/Atestado</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>📅 Data</label>
+                    <input type="date" id="modalFaltaData">
+                </div>
+
+                <div class="form-group">
+                    <label>📋 Tipo</label>
+                    <select id="modalFaltaTipo">
+                        <option value="falta">❌ Falta</option>
+                        <option value="atestado">📄 Atestado</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>⏱️ Carga horária</label>
+                    <select id="modalFaltaCarga">
+                        <option value="240">4h</option>
+                        <option value="300">5h</option>
+                        <option value="360">6h</option>
+                        <option value="480">8h</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>📝 Observação (opcional)</label>
+                    <textarea id="modalFaltaObs" rows="3" placeholder="Ex: Consulta médica, particular, etc..."></textarea>
+                </div>
+
+                <div id="faltaModalMessage"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-save" onclick="salvarFaltaModal()">💾 Salvar</button>
+                <button class="modal-btn modal-btn-cancel" onclick="fecharModalFalta()">✖️ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EDIÇÃO -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Editar Ponto</h2>
+                <div id="editModalDate" style="font-size: 0.85em; margin-top: 5px; opacity: 0.9;"></div>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px; padding: 12px; background: rgba(244, 67, 54, 0.1); border-left: 3px solid #f44336; border-radius: 5px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                        <input type="checkbox" id="editFalta" style="width: auto; cursor: pointer;">
+                        <span style="color: #f44336; font-weight: 600; font-size: 0.9em;">🚫 MARCAR COMO FALTA/AUSÊNCIA</span>
+                    </label>
+                    <small style="display: block; margin-top: 6px; color: #666; font-size: 0.8em;">
+                        Ao marcar como falta, desconsidera os horários e desconta a carga horária selecionada do banco
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label>⏱️ Carga horária considerada</label>
+                    <select id="editCargaHoraria">
+                        <option value="240">4h</option>
+                        <option value="300">5h</option>
+                        <option value="360">6h</option>
+                        <option value="480">8h</option>
+                    </select>
+                </div>
+
+                <div id="editHorariosContainer">
+                    <div class="modal-time-grid">
+                        <div class="form-group">
+                            <label>🌅 Entrada 1</label>
+                            <input type="time" id="editEntrada1">
+                        </div>
+                        <div class="form-group">
+                            <label>🍽️ Saída 1</label>
+                            <input type="time" id="editSaida1">
+                        </div>
+                        <div class="form-group">
+                            <label>🔙 Entrada 2</label>
+                            <input type="time" id="editEntrada2">
+                        </div>
+                        <div class="form-group">
+                            <label>🌆 Saída 2</label>
+                            <input type="time" id="editSaida2">
+                        </div>
+                        <div class="form-group">
+                            <label>⚡ Entrada 3</label>
+                            <input type="time" id="editEntrada3">
+                        </div>
+                        <div class="form-group">
+                            <label>⚡ Saída 3</label>
+                            <input type="time" id="editSaida3">
+                        </div>
+                        <div class="form-group">
+                            <label>🚨 Entrada 4</label>
+                            <input type="time" id="editEntrada4">
+                        </div>
+                        <div class="form-group">
+                            <label>🚨 Saída 4</label>
+                            <input type="time" id="editSaida4">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>📝 Observação</label>
+                    <textarea id="editObservacao" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-save" onclick="salvarEdicao()">💾 Salvar</button>
+                <button class="modal-btn modal-btn-delete" onclick="excluirPonto()">🗑️ Excluir</button>
+                <button class="modal-btn modal-btn-cancel" onclick="fecharModal()">✖️ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // CONFIGURAÇÃO DO SUPABASE
+        // ========================================
+        const SUPABASE_URL = 'https://egatysvguaxvohblgqbu.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnYXR5c3ZndWF4dm9oYmxncWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5MDYzNzAsImV4cCI6MjA3ODQ4MjM3MH0.SEQ4XyzMCAHBZVHBn_qOWf5fqtYAqkeWBwHz92Ngs90';
+
+        // Variáveis globais - DECLARADAS UMA ÚNICA VEZ
+        let supabaseClient = null;
+        let usuarioAtual = null;
+        let pontoEditandoId = null;
+        let dadosRelatorio = null;
+
+        // Cargas horárias em minutos
+        // 240 = 4h | 300 = 5h | 360 = 6h | 480 = 8h
+        const DATA_INICIO_CARGA_5H = '2026-03-01';
+        const CARGA_PADRAO_ANTES_01032026 = 8 * 60;
+        const CARGA_PADRAO_APOS_01032026 = 5 * 60;
+        const TOLERANCIA_MINUTOS = 10;
+
+        function obterCargaPadraoPorData(data) {
+            if (data && data >= DATA_INICIO_CARGA_5H) {
+                return CARGA_PADRAO_APOS_01032026;
+            }
+
+            return CARGA_PADRAO_ANTES_01032026;
+        }
+
+        function obterCargaHorariaMinutos(ponto) {
+            if (ponto && ponto.carga_horaria_minutos) {
+                return Number(ponto.carga_horaria_minutos);
+            }
+
+            if (ponto && ponto.data) {
+                return obterCargaPadraoPorData(ponto.data);
+            }
+
+            const dataSelecionada = document.getElementById('selectedDate')?.value;
+            return obterCargaPadraoPorData(dataSelecionada);
+        }
+
+        function textoCargaHoraria(minutos) {
+            return `${Number(minutos) / 60}h`;
+        }
+
+        function somarMinutosHora(hora, minutosAdicionar) {
+            const [h, m] = hora.split(':').map(Number);
+            const total = h * 60 + m + Number(minutosAdicionar);
+
+            const novaHora = Math.floor(total / 60) % 24;
+            const novoMinuto = total % 60;
+
+            return `${String(novaHora).padStart(2, '0')}:${String(novoMinuto).padStart(2, '0')}`;
+        }
+
+        // ========================================
+        // INICIALIZAÇÃO
+        // ========================================
+        async function init() {
+            console.log('🚀 Iniciando aplicação...');
+            
+            try {
+                // Inicia o relógio PRIMEIRO (independente do Supabase)
+                atualizarRelogio();
+                setInterval(atualizarRelogio, 1000);
+                console.log('✅ Relógio iniciado');
+                
+                // Tenta conectar ao Supabase
+                if (typeof window.supabase === 'undefined') {
+                    throw new Error('Biblioteca Supabase não carregada');
+                }
+                
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                console.log('✅ Supabase conectado');
+                
+                // Carrega usuário
+                await carregarUsuario();
+                
+                // Configura data
+                const hoje = new Date();
+                const ano = hoje.getFullYear();
+                const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+                const dia = String(hoje.getDate()).padStart(2, '0');
+                const dataHoje = `${ano}-${mes}-${dia}`;
+                
+                document.getElementById('selectedDate').value = dataHoje;
+                document.getElementById('cargaHorariaDia').value = obterCargaPadraoPorData(dataHoje);
+                
+                const primeiroDia = String(1).padStart(2, '0');
+                const dataInicio = `${ano}-${mes}-${primeiroDia}`;
+                
+                document.getElementById('reportStartDate').value = dataInicio;
+                document.getElementById('reportEndDate').value = dataHoje;
+                
+                // Carrega pontos
+                await carregarPontosDeHoje();
+                
+                // Event listener para mudança de data
+                document.getElementById('selectedDate').addEventListener('change', function() {
+                    const dataSelecionada = this.value;
+                    document.getElementById('cargaHorariaDia').value = obterCargaPadraoPorData(dataSelecionada);
+                    carregarPontosDeHoje();
+                });
+                
+                console.log('✅ Aplicação iniciada com sucesso');
+                
+            } catch (error) {
+                console.error('❌ Erro na inicialização:', error);
+                mostrarErroGeral(error.message);
+            }
+        }
+
+        function mostrarErroGeral(mensagem) {
+            document.getElementById('todayPoints').innerHTML = `
+                <div class="alert alert-error">
+                    ⚠️ Erro: ${mensagem}
+                </div>
+            `;
+        }
+
+        async function carregarUsuario() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('usuarios')
+                    .select('*')
+                    .eq('nome', 'Paulo Ricardo Pereira')
+                    .single();
+                
+                if (error) {
+                    console.warn('⚠️ Usuário específico não encontrado, buscando primeiro usuário...');
+                    
+                    const { data: usuarios, error: error2 } = await supabaseClient
+                        .from('usuarios')
+                        .select('*')
+                        .limit(1);
+                    
+                    if (error2) {
+                        throw new Error('Não foi possível conectar ao banco de dados. Verifique se as tabelas foram criadas.');
+                    }
+                    
+                    if (usuarios && usuarios.length > 0) {
+                        usuarioAtual = usuarios[0];
+                        document.getElementById('userLocation').textContent = 
+                            `${usuarios[0].nome} - ${usuarios[0].setor} - ${usuarios[0].empresa}`;
+                        console.log('✅ Usando primeiro usuário:', usuarios[0].nome);
+                    } else {
+                        throw new Error('Nenhum usuário encontrado. Execute o script SQL primeiro.');
+                    }
+                    return;
+                }
+                
+                if (data) {
+                    usuarioAtual = data;
+                    document.getElementById('userLocation').textContent = 
+                        `${data.nome} - ${data.setor} - ${data.empresa}`;
+                    console.log('✅ Usuário carregado:', data.nome);
+                }
+            } catch (error) {
+                console.error('❌ Erro ao carregar usuário:', error);
+                document.getElementById('userLocation').innerHTML = 
+                    `<span style="color: #f44336;">⚠️ ${error.message}</span>`;
+            }
+        }
+
+        function atualizarRelogio() {
+            const agora = new Date();
+            
+            const horas = String(agora.getHours()).padStart(2, '0');
+            const minutos = String(agora.getMinutes()).padStart(2, '0');
+            const segundos = String(agora.getSeconds()).padStart(2, '0');
+            document.getElementById('timeDisplay').textContent = `${horas}:${minutos}:${segundos}`;
+            
+            const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+            const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+            
+            const diaSemana = diasSemana[agora.getDay()];
+            const dia = agora.getDate();
+            const mes = meses[agora.getMonth()];
+            const ano = agora.getFullYear();
+            
+            document.getElementById('dateDisplay').textContent = 
+                `${diaSemana}, ${dia} de ${mes} de ${ano}`;
+        }
+
+        // ========================================
+        // NAVEGAÇÃO
+        // ========================================
+        function switchScreen(screen) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            event.target.closest('.nav-item').classList.add('active');
+            
+            if (screen === 'home') {
+                document.getElementById('home-screen').classList.add('active');
+                carregarPontosDeHoje();
+            } else if (screen === 'report') {
+                document.getElementById('report-screen').classList.add('active');
+            }
+        }
+
+        // ========================================
+        // REGISTRAR PONTO
+        // ========================================
+        async function registrarPonto() {
+            if (!usuarioAtual || !supabaseClient) {
+                alert('Sistema não está pronto. Verifique as configurações.');
+                return;
+            }
+
+            try {
+                const data = document.getElementById('selectedDate').value;
+                if (!data) {
+                    alert('Selecione uma data!');
+                    return;
+                }
+
+                const cargaHorariaMinutos = Number(
+                    document.getElementById('cargaHorariaDia').value || obterCargaPadraoPorData(data)
+                );
+
+                const agora = new Date();
+                const horaAtual = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
+
+                const { data: pontoExistente } = await supabaseClient
+                    .from('pontos')
+                    .select('*')
+                    .eq('usuario_id', usuarioAtual.id)
+                    .eq('data', data)
+                    .single();
+
+                let pontoData = {
+                    usuario_id: usuarioAtual.id,
+                    data: data,
+                    carga_horaria_minutos: cargaHorariaMinutos,
+                    updated_at: getTimestampBrasilia()
+                };
+
+                if (!pontoExistente) {
+                    pontoData.entrada1 = horaAtual;
+                } else {
+                    pontoData = {
+                        ...pontoExistente,
+                        carga_horaria_minutos: cargaHorariaMinutos,
+                        updated_at: getTimestampBrasilia()
+                    };
+
+                    if (!pontoExistente.saida1) {
+                        pontoData.saida1 = horaAtual;
+                    } else if (!pontoExistente.entrada2) {
+                        pontoData.entrada2 = horaAtual;
+                    } else if (!pontoExistente.saida2) {
+                        pontoData.saida2 = horaAtual;
+                    } else if (!pontoExistente.entrada3) {
+                        pontoData.entrada3 = horaAtual;
+                    } else if (!pontoExistente.saida3) {
+                        pontoData.saida3 = horaAtual;
+                    } else if (!pontoExistente.entrada4) {
+                        pontoData.entrada4 = horaAtual;
+                    } else if (!pontoExistente.saida4) {
+                        pontoData.saida4 = horaAtual;
+                    } else {
+                        alert('Todos os pontos do dia já foram registrados!');
+                        return;
+                    }
+                }
+
+                let result;
+                if (pontoExistente) {
+                    result = await supabaseClient
+                        .from('pontos')
+                        .update(pontoData)
+                        .eq('id', pontoExistente.id);
+                } else {
+                    result = await supabaseClient
+                        .from('pontos')
+                        .insert([pontoData]);
+                }
+
+                if (result.error) throw result.error;
+                
+                await carregarPontosDeHoje();
+            } catch (error) {
+                console.error('Erro ao registrar ponto:', error);
+                alert('Erro ao registrar ponto: ' + error.message);
+            }
+        }
+
+        async function carregarPontosDeHoje() {
+            if (!usuarioAtual || !supabaseClient) return;
+
+            try {
+                const data = document.getElementById('selectedDate').value;
+                
+                const { data: ponto, error } = await supabaseClient
+                    .from('pontos')
+                    .select('*')
+                    .eq('usuario_id', usuarioAtual.id)
+                    .eq('data', data)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') throw error;
+
+                const container = document.getElementById('todayPoints');
+                
+                if (!ponto) {
+                    document.getElementById('cargaHorariaDia').value = obterCargaPadraoPorData(data);
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⏱️</div>
+                            <div>Nenhum ponto registrado hoje</div>
+                        </div>
+                    `;
+                    document.getElementById('hoursWorked').textContent = '00:00:00';
+                    return;
+                }
+
+                const cargaDia = obterCargaHorariaMinutos(ponto);
+                document.getElementById('cargaHorariaDia').value = cargaDia;
+
+                const totalMinutos = calcularMinutosTrabalhados(ponto);
+                document.getElementById('hoursWorked').textContent = minutosParaHoras(totalMinutos);
+
+                let html = '';
+                const pontos = [
+                    { tipo: 'Entrada registrada', campo: 'entrada1', icon: '✓' },
+                    { tipo: 'Saída registrada', campo: 'saida1', icon: '✓' },
+                    { tipo: 'Entrada registrada', campo: 'entrada2', icon: '✓' },
+                    { tipo: 'Saída registrada', campo: 'saida2', icon: '✓' },
+                    { tipo: 'Entrada extra', campo: 'entrada3', icon: '✓' },
+                    { tipo: 'Saída extra', campo: 'saida3', icon: '✓' },
+                    { tipo: 'Entrada urgência', campo: 'entrada4', icon: '✓' },
+                    { tipo: 'Saída urgência', campo: 'saida4', icon: '✓' }
+                ];
+
+                const isFalta = ponto.observacao && ponto.observacao.toUpperCase().startsWith('FALTA');
+                const isAtestado = ponto.observacao && ponto.observacao.toUpperCase().startsWith('ATESTADO');
+
+                if (isFalta || isAtestado) {
+                    const cor = isFalta ? '#f44336' : '#4CAF50';
+                    const corFundo = isFalta ? 'rgba(244, 67, 54, 0.1)' : 'rgba(76, 175, 80, 0.1)';
+                    const icone = isFalta ? '❌' : '📄';
+                    const titulo = isFalta ? 'FALTA' : 'ATESTADO';
+                    const horas = isFalta ? `-${minutosParaHoras(cargaDia)}` : minutosParaHoras(cargaDia);
+                    
+                    html += `
+                        <div class="point-item" style="border: 2px solid ${cor}; background: ${corFundo};">
+                            <div class="point-check" style="color: ${cor}; font-size: 2.5em;">${icone}</div>
+                            <div class="point-info" style="flex: 1;">
+                                <div class="point-type" style="color: ${cor}; font-size: 1.2em; font-weight: bold;">${titulo}</div>
+                                <div class="point-time" style="color: ${cor}; font-size: 1.5em; font-weight: bold; margin: 5px 0;">Total: ${horas}</div>
+                                <div style="color: #ccc; font-size: 0.85em;">Carga considerada: ${textoCargaHoraria(cargaDia)}</div>
+                                <div style="color: #ccc; font-size: 0.85em;">Observação: ${ponto.observacao}</div>
+                            </div>
+                            <div class="point-actions">
+                                <button class="icon-btn" onclick="abrirModalEdicao('${ponto.id}')">✏️</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    pontos.forEach(p => {
+                        if (ponto[p.campo]) {
+                            html += `
+                                <div class="point-item">
+                                    <div class="point-check">${p.icon}</div>
+                                    <div class="point-info">
+                                        <div class="point-type">${p.tipo}</div>
+                                        <div class="point-time">horário: ${ponto[p.campo]}</div>
+                                        <div style="font-size: 0.75em; color: #999; margin-top: 3px;">Carga considerada: ${textoCargaHoraria(cargaDia)}</div>
+                                    </div>
+                                    <div class="point-actions">
+                                        <button class="icon-btn" onclick="abrirModalEdicao('${ponto.id}')">✏️</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                }
+
+                container.innerHTML = html || `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⏱️</div>
+                        <div>Nenhum ponto registrado</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Erro ao carregar pontos:', error);
+                mostrarErroGeral(error.message);
+            }
+        }
+
+        // ========================================
+        // EDIÇÃO DE PONTO
+        // ========================================
+        async function abrirModalEdicao(pontoId) {
+            pontoEditandoId = pontoId;
+            
+            try {
+                const { data: ponto, error } = await supabaseClient
+                    .from('pontos')
+                    .select('*')
+                    .eq('id', pontoId)
+                    .single();
+
+                if (error) throw error;
+
+                if (ponto) {
+                    document.getElementById('editModalDate').textContent = formatarData(ponto.data);
+                    document.getElementById('editEntrada1').value = ponto.entrada1 || '';
+                    document.getElementById('editSaida1').value = ponto.saida1 || '';
+                    document.getElementById('editEntrada2').value = ponto.entrada2 || '';
+                    document.getElementById('editSaida2').value = ponto.saida2 || '';
+                    document.getElementById('editEntrada3').value = ponto.entrada3 || '';
+                    document.getElementById('editSaida3').value = ponto.saida3 || '';
+                    document.getElementById('editEntrada4').value = ponto.entrada4 || '';
+                    document.getElementById('editSaida4').value = ponto.saida4 || '';
+                    document.getElementById('editCargaHoraria').value = obterCargaHorariaMinutos(ponto);
+                    document.getElementById('editObservacao').value = ponto.observacao || '';
+                    
+                    document.getElementById('editModal').classList.add('active');
+                }
+            } catch (error) {
+                console.error('Erro ao abrir modal:', error);
+                alert('Erro ao carregar ponto para edição');
+            }
+        }
+
+        async function salvarEdicao() {
+            if (!pontoEditandoId) return;
+
+            try {
+                const pontoData = {
+                    entrada1: document.getElementById('editEntrada1').value || null,
+                    saida1: document.getElementById('editSaida1').value || null,
+                    entrada2: document.getElementById('editEntrada2').value || null,
+                    saida2: document.getElementById('editSaida2').value || null,
+                    entrada3: document.getElementById('editEntrada3').value || null,
+                    saida3: document.getElementById('editSaida3').value || null,
+                    entrada4: document.getElementById('editEntrada4').value || null,
+                    saida4: document.getElementById('editSaida4').value || null,
+                    carga_horaria_minutos: Number(document.getElementById('editCargaHoraria').value),
+                    observacao: document.getElementById('editObservacao').value || null,
+                    updated_at: getTimestampBrasilia()
+                };
+
+                const { error } = await supabaseClient
+                    .from('pontos')
+                    .update(pontoData)
+                    .eq('id', pontoEditandoId);
+
+                if (error) throw error;
+
+                fecharModal();
+                await carregarPontosDeHoje();
+            } catch (error) {
+                console.error('Erro ao salvar edição:', error);
+                alert('Erro ao salvar: ' + error.message);
+            }
+        }
+
+        async function excluirPonto() {
+            if (!pontoEditandoId) return;
+            
+            if (!confirm('Deseja realmente excluir este ponto?')) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('pontos')
+                    .delete()
+                    .eq('id', pontoEditandoId);
+
+                if (error) throw error;
+
+                fecharModal();
+                await carregarPontosDeHoje();
+            } catch (error) {
+                console.error('Erro ao excluir:', error);
+                alert('Erro ao excluir: ' + error.message);
+            }
+        }
+
+        function fecharModal() {
+            document.getElementById('editModal').classList.remove('active');
+            pontoEditandoId = null;
+        }
+
+        // ========================================
+        // MODAL DE FALTA/ATESTADO
+        // ========================================
+        function abrirModalFalta() {
+            const hoje = new Date();
+            const ano = hoje.getFullYear();
+            const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+            const dia = String(hoje.getDate()).padStart(2, '0');
+            const dataHoje = `${ano}-${mes}-${dia}`;
+            document.getElementById('modalFaltaData').value = dataHoje;
+            document.getElementById('modalFaltaCarga').value = obterCargaPadraoPorData(dataHoje);
+            
+            document.getElementById('modalFaltaTipo').value = 'falta';
+            document.getElementById('modalFaltaObs').value = '';
+            document.getElementById('faltaModalMessage').innerHTML = '';
+            
+            document.getElementById('faltaModal').classList.add('active');
+        }
+
+        function fecharModalFalta() {
+            document.getElementById('faltaModal').classList.remove('active');
+        }
+
+        document.addEventListener('change', function(event) {
+            if (event.target && event.target.id === 'modalFaltaData') {
+                document.getElementById('modalFaltaCarga').value = obterCargaPadraoPorData(event.target.value);
+            }
+        });
+
+        async function salvarFaltaModal() {
+            if (!usuarioAtual || !supabaseClient) return;
+
+            try {
+                const data = document.getElementById('modalFaltaData').value;
+                const tipo = document.getElementById('modalFaltaTipo').value;
+                const observacao = document.getElementById('modalFaltaObs').value;
+                const cargaHorariaMinutos = Number(
+                    document.getElementById('modalFaltaCarga').value || obterCargaPadraoPorData(data)
+                );
+
+                if (!data) {
+                    showFaltaModalMessage('Selecione uma data!', 'error');
+                    return;
+                }
+
+                const { data: existente } = await supabaseClient
+                    .from('pontos')
+                    .select('id')
+                    .eq('usuario_id', usuarioAtual.id)
+                    .eq('data', data)
+                    .single();
+
+                if (existente) {
+                    if (!confirm('Já existe um ponto registrado nesta data. Deseja substituir?')) {
+                        return;
+                    }
+                }
+
+                const pontoData = {
+                    usuario_id: usuarioAtual.id,
+                    data: data,
+                    entrada1: tipo === 'atestado' ? '08:00' : null,
+                    saida1: tipo === 'atestado' ? somarMinutosHora('08:00', cargaHorariaMinutos) : null,
+                    entrada2: null,
+                    saida2: null,
+                    entrada3: null,
+                    saida3: null,
+                    entrada4: null,
+                    saida4: null,
+                    carga_horaria_minutos: cargaHorariaMinutos,
+                    observacao: `${tipo === 'falta' ? 'FALTA' : 'ATESTADO'}${observacao ? ': ' + observacao : ''}`,
+                    updated_at: getTimestampBrasilia()
+                };
+
+                let result;
+                if (existente) {
+                    result = await supabaseClient
+                        .from('pontos')
+                        .update(pontoData)
+                        .eq('id', existente.id);
+                } else {
+                    result = await supabaseClient
+                        .from('pontos')
+                        .insert([pontoData]);
+                }
+
+                if (result.error) throw result.error;
+
+                showFaltaModalMessage(`✅ ${tipo === 'falta' ? 'Falta' : 'Atestado'} registrado com sucesso!`, 'success');
+                
+                setTimeout(() => {
+                    fecharModalFalta();
+                    carregarPontosDeHoje();
+                }, 1500);
+
+            } catch (error) {
+                console.error('Erro ao salvar:', error);
+                showFaltaModalMessage('Erro ao salvar: ' + error.message, 'error');
+            }
+        }
+
+        function showFaltaModalMessage(msg, type) {
+            const area = document.getElementById('faltaModalMessage');
+            area.innerHTML = `<div class="alert alert-${type}" style="margin-top: 12px;">${msg}</div>`;
+        }
+
+        // ========================================
+        // RELATÓRIO
+        // ========================================
+        async function gerarRelatorio() {
+            if (!usuarioAtual || !supabaseClient) return;
+
+            try {
+                const dataInicio = document.getElementById('reportStartDate').value;
+                const dataFim = document.getElementById('reportEndDate').value;
+
+                if (!dataInicio || !dataFim) {
+                    alert('Selecione o período!');
+                    return;
+                }
+
+                const { data: pontos, error: errorPontos } = await supabaseClient
+                    .from('pontos')
+                    .select('*')
+                    .eq('usuario_id', usuarioAtual.id)
+                    .gte('data', dataInicio)
+                    .lte('data', dataFim)
+                    .order('data', { ascending: true });
+
+                if (errorPontos) throw errorPontos;
+
+                const hoje = new Date();
+                const dataHoje = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+                
+                const { data: todosPontos, error: errorTodosPontos } = await supabaseClient
+                    .from('pontos')
+                    .select('*')
+                    .eq('usuario_id', usuarioAtual.id)
+                    .lte('data', dataHoje)
+                    .order('data', { ascending: true });
+
+                if (errorTodosPontos) throw errorTodosPontos;
+
+                let totalMinutosTrabalhados = 0;
+                let totalMinutosExtras = 0;
+                let totalMinutosDevendo = 0;
+
+                if (pontos) {
+                    pontos.forEach(ponto => {
+                        const minutosReais = calcularMinutosTrabalhados(ponto);
+                        const cargaDia = obterCargaHorariaMinutos(ponto);
+                        const toleranciaInferior = cargaDia - TOLERANCIA_MINUTOS;
+                        const toleranciaSuperior = cargaDia + TOLERANCIA_MINUTOS;
+                        
+                        totalMinutosTrabalhados += minutosReais;
+                        
+                        if (minutosReais > toleranciaSuperior) {
+                            totalMinutosExtras += (minutosReais - cargaDia);
+                        }
+                        else if (minutosReais < toleranciaInferior && minutosReais >= 0) {
+                            totalMinutosDevendo += (minutosReais - cargaDia);
+                        }
+                        else if (minutosReais < 0) {
+                            totalMinutosDevendo += minutosReais;
+                        }
+                    });
+                }
+
+                const saldoMinutos = totalMinutosExtras + totalMinutosDevendo;
+
+                let bancoHorasExtras = 0;
+                let bancoHorasDevendo = 0;
+
+                if (todosPontos) {
+                    todosPontos.forEach(ponto => {
+                        const minutosReais = calcularMinutosTrabalhados(ponto);
+                        const cargaDia = obterCargaHorariaMinutos(ponto);
+                        const toleranciaInferior = cargaDia - TOLERANCIA_MINUTOS;
+                        const toleranciaSuperior = cargaDia + TOLERANCIA_MINUTOS;
+                        
+                        if (minutosReais > toleranciaSuperior) {
+                            bancoHorasExtras += (minutosReais - cargaDia);
+                        }
+                        else if (minutosReais < toleranciaInferior && minutosReais >= 0) {
+                            bancoHorasDevendo += (minutosReais - cargaDia);
+                        }
+                        else if (minutosReais < 0) {
+                            bancoHorasDevendo += minutosReais;
+                        }
+                    });
+                }
+
+                const bancoHorasAcumulado = bancoHorasExtras + bancoHorasDevendo;
+
+                dadosRelatorio = {
+                    pontos,
+                    totalTrabalhado: minutosParaHoras(totalMinutosTrabalhados),
+                    horasExtras: minutosParaHoras(totalMinutosExtras),
+                    horasDevendo: minutosParaHoras(totalMinutosDevendo),
+                    saldo: minutosParaHoras(saldoMinutos),
+                    bancoHoras: minutosParaHoras(bancoHorasAcumulado),
+                    periodo: `${formatarData(dataInicio)} a ${formatarData(dataFim)}`
+                };
+
+                const corSaldo = saldoMinutos >= 0 ? '#4CAF50' : '#f44336';
+                const corBanco = bancoHorasAcumulado >= 0 ? '#4CAF50' : '#f44336';
+                
+                document.getElementById('reportSummary').innerHTML = `
+                    <div class="summary-card">
+                        <div class="summary-title">📊 Resumo do Período</div>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <div class="summary-item-label">⏱️ Total</div>
+                                <div class="summary-item-value">${minutosParaHoras(totalMinutosTrabalhados)}</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-item-label">⚡ Extras</div>
+                                <div class="summary-item-value">${minutosParaHoras(totalMinutosExtras)}</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-item-label">⚖️ Devendo</div>
+                                <div class="summary-item-value" style="color: ${totalMinutosDevendo >= 0 ? '#4CAF50' : '#f44336'}">${minutosParaHoras(totalMinutosDevendo)}</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-item-label">💼 Saldo Total</div>
+                                <div class="summary-item-value" style="color: ${corSaldo}; font-size: 1.4em;">${minutosParaHoras(saldoMinutos)}</div>
+                                <div style="font-size: 0.65em; opacity: 0.7; margin-top: 3px;">Do período selecionado</div>
+                            </div>
+                        </div>
+                        
+                        <div class="banco-horas-destaque" style="border-color: ${corBanco};">
+                            <div class="banco-horas-label">💼 BANCO DE HORAS ACUMULADO</div>
+                            <div class="banco-horas-value" style="color: ${corBanco}">
+                                ${minutosParaHoras(bancoHorasAcumulado)}
+                            </div>
+                            <div class="banco-horas-status">
+                                ${bancoHorasAcumulado >= 0 ? '✅ Você tem crédito de horas' : '⚠️ Você está devendo horas'}
+                            </div>
+                            <div class="banco-horas-calc">
+                                Total desde o início até hoje (${formatarData(dataHoje)})
+                            </div>
+                            <div class="banco-horas-calc">
+                                Extras Totais: ${minutosParaHoras(bancoHorasExtras)} | Devendo Total: ${minutosParaHoras(bancoHorasDevendo)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('pdfBtn').style.display = 'block';
+                document.getElementById('visualizarPdfBtn').style.display = 'block';
+
+                let html = '';
+                if (pontos && pontos.length > 0) {
+                    pontos.forEach(ponto => {
+                        const minutosReais = calcularMinutosTrabalhados(ponto);
+                        const minutosParaBanco = calcularMinutosParaBanco(minutosReais, ponto);
+                        const cargaDia = obterCargaHorariaMinutos(ponto);
+                        
+                        const isFalta = ponto.observacao && ponto.observacao.toUpperCase().startsWith('FALTA');
+                        const isAtestado = ponto.observacao && ponto.observacao.toUpperCase().startsWith('ATESTADO');
+                        
+                        let corTotal = '#FF6B35';
+                        let textoTotal = minutosParaHoras(minutosParaBanco);
+                        
+                        if (isFalta) {
+                            corTotal = '#f44336';
+                            textoTotal = `-${minutosParaHoras(cargaDia)}`;
+                        } else if (isAtestado) {
+                            corTotal = '#4CAF50';
+                            textoTotal = minutosParaHoras(cargaDia);
+                        }
+                        
+                        const aplicouTolerancia = minutosReais !== minutosParaBanco && !isFalta && !isAtestado;
+                        
+                        html += `
+                            <div class="point-item">
+                                <div class="point-info" style="flex: 1;">
+                                    <div class="point-type">${formatarData(ponto.data)}</div>
+                                    ${isFalta || isAtestado ? 
+                                        `<div style="color: ${corTotal}; font-weight: bold; margin-top: 5px;">
+                                            ${ponto.observacao}
+                                        </div>
+                                        <div style="font-size: 0.75em; color: #999; margin-top: 3px;">
+                                            Carga considerada: ${textoCargaHoraria(cargaDia)}
+                                        </div>` :
+                                        `<div class="point-time">
+                                            ${ponto.entrada1 || '--'} | ${ponto.saida1 || '--'} | 
+                                            ${ponto.entrada2 || '--'} | ${ponto.saida2 || '--'}
+                                            ${ponto.entrada3 || ponto.saida3 || ponto.entrada4 || ponto.saida4 ? 
+                                                `<br>${ponto.entrada3 || '--'} | ${ponto.saida3 || '--'} | ${ponto.entrada4 || '--'} | ${ponto.saida4 || '--'}` : ''}
+                                        </div>
+                                        ${aplicouTolerancia ? 
+                                            `<div style="font-size: 0.75em; color: #4CAF50; margin-top: 3px;">
+                                                Real: ${minutosParaHoras(minutosReais)} → Banco: ${minutosParaHoras(minutosParaBanco)} ✓
+                                            </div>` : 
+                                            `<div style="font-size: 0.75em; color: #999; margin-top: 3px;">
+                                                Real/Banco: ${minutosParaHoras(minutosReais)}
+                                            </div>`
+                                        }
+                                        <div style="font-size: 0.75em; color: #999; margin-top: 3px;">
+                                            Carga considerada: ${textoCargaHoraria(cargaDia)}
+                                        </div>`
+                                    }
+                                </div>
+                                <div style="font-weight: bold; color: ${corTotal}; font-size: 1em;">
+                                    ${textoTotal}
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html = '<div class="empty-state"><div class="empty-state-icon">📊</div><div>Nenhum ponto no período</div></div>';
+                }
+
+                document.getElementById('reportDetails').innerHTML = html;
+            } catch (error) {
+                console.error('Erro ao gerar relatório:', error);
+                alert('Erro ao gerar relatório: ' + error.message);
+            }
+        }
+
+        // ========================================
+        // FUNÇÕES DE PDF
+        // ========================================
+        function adicionarResumo(doc, startY, totalMinutosConsiderados) {
+            doc.setFontSize(13);
+            doc.setFont(undefined, 'bold');
+            doc.text('Resumo', 15, startY);
+            
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Total Trabalhado: ${dadosRelatorio.totalTrabalhado}`, 15, startY + 8);
+            doc.text(`Total Horas Consideradas: ${minutosParaHoras(totalMinutosConsiderados)}`, 15, startY + 15);
+            doc.text(`Horas Extras: ${dadosRelatorio.horasExtras}`, 15, startY + 22);
+            doc.text(`Horas Devendo: ${dadosRelatorio.horasDevendo}`, 15, startY + 29);
+            
+            doc.setFont(undefined, 'bold');
+            doc.text(`Saldo (período): ${dadosRelatorio.saldo}`, 15, startY + 36);
+            doc.text(`Banco de Horas (acumulado): ${dadosRelatorio.bancoHoras}`, 15, startY + 43);
+        }
+
+        function montarDadosTabelaPDF() {
+            let totalMinutosConsiderados = 0;
+
+            const tableData = dadosRelatorio.pontos.map(p => {
+                const isFalta = p.observacao && p.observacao.toUpperCase().startsWith('FALTA');
+                const isAtestado = p.observacao && p.observacao.toUpperCase().startsWith('ATESTADO');
+                const cargaDia = obterCargaHorariaMinutos(p);
+                const toleranciaInferior = cargaDia - TOLERANCIA_MINUTOS;
+                const toleranciaSuperior = cargaDia + TOLERANCIA_MINUTOS;
+                
+                const minutosReais = calcularMinutosTrabalhados(p);
+                const minutosParaBanco = calcularMinutosParaBanco(minutosReais, p);
+                
+                let horaConsiderada = '';
+                let horaExtra = '';
+                let horaDevendo = '';
+                let totalTexto = '';
+                
+                if (isFalta) {
+                    totalTexto = `-${minutosParaHoras(cargaDia)}`;
+                    horaConsiderada = `-${minutosParaHoras(cargaDia)}`;
+                    horaDevendo = `-${minutosParaHoras(cargaDia)}`;
+                    totalMinutosConsiderados += -cargaDia;
+                } else if (isAtestado) {
+                    totalTexto = minutosParaHoras(cargaDia);
+                    horaConsiderada = minutosParaHoras(cargaDia);
+                    totalMinutosConsiderados += cargaDia;
+                } else {
+                    totalTexto = minutosParaHoras(minutosReais);
+                    horaConsiderada = minutosParaHoras(minutosParaBanco);
+                    totalMinutosConsiderados += minutosParaBanco;
+                    
+                    if (minutosReais > toleranciaSuperior) {
+                        horaExtra = minutosParaHoras(minutosReais - cargaDia);
+                    }
+                    
+                    if (minutosReais < toleranciaInferior && minutosReais > 0) {
+                        horaDevendo = minutosParaHoras(minutosReais - cargaDia);
+                    }
+                }
+                
+                return [
+                    formatarData(p.data),
+                    textoCargaHoraria(cargaDia),
+                    isFalta ? 'FALTA' : (p.entrada1 || '--'),
+                    isFalta ? '' : (p.saida1 || '--'),
+                    isAtestado ? 'ATESTADO' : (isFalta ? '' : (p.entrada2 || '--')),
+                    isFalta || isAtestado ? '' : (p.saida2 || '--'),
+                    isFalta || isAtestado ? '' : (p.entrada3 || '--'),
+                    isFalta || isAtestado ? '' : (p.saida3 || '--'),
+                    isFalta || isAtestado ? '' : (p.entrada4 || '--'),
+                    isFalta || isAtestado ? '' : (p.saida4 || '--'),
+                    totalTexto,
+                    horaConsiderada,
+                    horaExtra,
+                    horaDevendo
+                ];
+            });
+
+            return { tableData, totalMinutosConsiderados };
+        }
+
+        function gerarPDF(abrirEmNovaAba = false) {
+            if (!dadosRelatorio) return;
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('l', 'mm', 'a4');
+
+                doc.setFontSize(18);
+                doc.setFont(undefined, 'bold');
+                doc.text('Relatório de Ponto', 148, 15, { align: 'center' });
+                
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.text(`${usuarioAtual.empresa}`, 148, 23, { align: 'center' });
+                
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Funcionário: ${usuarioAtual.nome}`, 15, 32);
+                doc.text(`Setor: ${usuarioAtual.setor}`, 15, 38);
+                doc.text(`Período: ${dadosRelatorio.periodo}`, 15, 44);
+                
+                if (dadosRelatorio.pontos && dadosRelatorio.pontos.length > 0) {
+                    const { tableData, totalMinutosConsiderados } = montarDadosTabelaPDF();
+
+                    doc.autoTable({
+                        startY: 50,
+                        head: [['Data', 'Carga', 'Ent.1', 'Saí.1', 'Ent.2', 'Saí.2', 'Ent.3', 'Saí.3', 'Ent.4', 'Saí.4', 'Total', 'H.Consid.', 'H.Extra', 'H.Dev']],
+                        body: tableData,
+                        theme: 'grid',
+                        margin: { left: 6, right: 6 },
+                        headStyles: { 
+                            fillColor: [255, 107, 53],
+                            fontSize: 7,
+                            halign: 'center'
+                        },
+                        bodyStyles: {
+                            fontSize: 6,
+                            halign: 'center'
+                        },
+                        columnStyles: {
+                            0: { cellWidth: 18 },
+                            1: { cellWidth: 13 },
+                            2: { cellWidth: 13 },
+                            3: { cellWidth: 13 },
+                            4: { cellWidth: 13 },
+                            5: { cellWidth: 13 },
+                            6: { cellWidth: 13 },
+                            7: { cellWidth: 13 },
+                            8: { cellWidth: 13 },
+                            9: { cellWidth: 13 },
+                            10: { cellWidth: 19 },
+                            11: { cellWidth: 19 },
+                            12: { cellWidth: 17 },
+                            13: { cellWidth: 17 }
+                        },
+                        didDrawPage: function (data) {
+                            doc.setFontSize(8);
+                            doc.text('Página ' + doc.internal.getNumberOfPages(), 
+                                doc.internal.pageSize.width / 2, 
+                                doc.internal.pageSize.height - 10, 
+                                { align: 'center' }
+                            );
+                        }
+                    });
+                    
+                    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 55;
+                    
+                    if (finalY > doc.internal.pageSize.height - 60) {
+                        doc.addPage();
+                        adicionarResumo(doc, 20, totalMinutosConsiderados);
+                    } else {
+                        adicionarResumo(doc, finalY, totalMinutosConsiderados);
+                    }
+                } else {
+                    adicionarResumo(doc, 55, 0);
+                }
+
+                if (abrirEmNovaAba) {
+                    const pdfBlob = doc.output('blob');
+                    const pdfUrl = URL.createObjectURL(pdfBlob);
+                    window.open(pdfUrl, '_blank');
+                } else {
+                    doc.save(`relatorio-${dadosRelatorio.periodo}.pdf`);
+                }
+            } catch (error) {
+                console.error('Erro ao gerar PDF:', error);
+                alert('Erro ao gerar PDF: ' + error.message);
+            }
+        }
+
+        function visualizarPDF() {
+            gerarPDF(true);
+        }
+
+        function exportarPDF() {
+            gerarPDF(false);
+        }
+
+        // ========================================
+        // UTILITÁRIOS
+        // ========================================
+        function calcularMinutosTrabalhados(ponto) {
+            const isFalta = ponto.observacao && ponto.observacao.toUpperCase().startsWith('FALTA');
+            const isAtestado = ponto.observacao && ponto.observacao.toUpperCase().startsWith('ATESTADO');
+            const cargaDia = obterCargaHorariaMinutos(ponto);
+            
+            if (isFalta) {
+                return -cargaDia;
+            }
+            
+            if (isAtestado) {
+                return cargaDia;
+            }
+            
+            let total = 0;
+            
+            if (ponto.entrada1 && ponto.saida1) {
+                total += calcularDiferencaMinutos(ponto.entrada1, ponto.saida1);
+            }
+            if (ponto.entrada2 && ponto.saida2) {
+                total += calcularDiferencaMinutos(ponto.entrada2, ponto.saida2);
+            }
+            if (ponto.entrada3 && ponto.saida3) {
+                total += calcularDiferencaMinutos(ponto.entrada3, ponto.saida3);
+            }
+            if (ponto.entrada4 && ponto.saida4) {
+                total += calcularDiferencaMinutos(ponto.entrada4, ponto.saida4);
+            }
+            
+            return total;
+        }
+
+        function calcularMinutosParaBanco(minutosTrabalhados, ponto) {
+            if (minutosTrabalhados < 0) {
+                return minutosTrabalhados;
+            }
+            
+            const cargaDia = obterCargaHorariaMinutos(ponto);
+            const toleranciaInferior = cargaDia - TOLERANCIA_MINUTOS;
+            const toleranciaSuperior = cargaDia + TOLERANCIA_MINUTOS;
+            
+            if (minutosTrabalhados >= toleranciaInferior && minutosTrabalhados <= toleranciaSuperior) {
+                return cargaDia;
+            }
+            
+            return minutosTrabalhados;
+        }
+
+        function calcularDiferencaMinutos(inicio, fim) {
+            const [h1, m1] = inicio.split(':').map(Number);
+            const [h2, m2] = fim.split(':').map(Number);
+            return (h2 * 60 + m2) - (h1 * 60 + m1);
+        }
+
+        function minutosParaHoras(minutos) {
+            const negativo = minutos < 0;
+            const abs = Math.abs(minutos);
+            const h = Math.floor(abs / 60);
+            const m = abs % 60;
+            const s = '00';
+            return `${negativo ? '-' : ''}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${s}`;
+        }
+
+        function formatarData(data) {
+            return new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
+        }
+
+        function getTimestampBrasilia() {
+            const agora = new Date();
+            const offsetBrasilia = -3 * 60;
+            const offsetLocal = agora.getTimezoneOffset();
+            const diferenca = offsetBrasilia - offsetLocal;
+            
+            const dataHoraBrasilia = new Date(agora.getTime() + diferenca * 60000);
+            return dataHoraBrasilia.toISOString();
+        }
+
+        // Inicia a aplicação quando a página carrega
+        window.onload = init;
+    </script>
+</body>
+</html>
