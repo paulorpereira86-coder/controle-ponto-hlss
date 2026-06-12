@@ -1216,46 +1216,78 @@
 
         async function carregarUsuario() {
             try {
-                const { data, error } = await supabaseClient
+                const { data: usuariosNome, error } = await supabaseClient
                     .from('usuarios')
                     .select('*')
                     .eq('nome', 'Paulo Ricardo Pereira')
-                    .single();
-                
+                    .limit(1);
+
                 if (error) {
-                    console.warn('⚠️ Usuário específico não encontrado, buscando primeiro usuário...');
-                    
-                    const { data: usuarios, error: error2 } = await supabaseClient
-                        .from('usuarios')
-                        .select('*')
-                        .limit(1);
-                    
-                    if (error2) {
-                        throw new Error('Não foi possível conectar ao banco de dados. Verifique se as tabelas foram criadas.');
-                    }
-                    
-                    if (usuarios && usuarios.length > 0) {
-                        usuarioAtual = usuarios[0];
-                        document.getElementById('userLocation').textContent = 
-                            `${usuarios[0].nome} - ${usuarios[0].setor} - ${usuarios[0].empresa}`;
-                        console.log('✅ Usando primeiro usuário:', usuarios[0].nome);
-                    } else {
-                        throw new Error('Nenhum usuário encontrado. Execute o script SQL primeiro.');
-                    }
+                    throw error;
+                }
+
+                if (usuariosNome && usuariosNome.length > 0) {
+                    usuarioAtual = usuariosNome[0];
+                    document.getElementById('userLocation').textContent =
+                        `${usuarioAtual.nome} - ${usuarioAtual.setor} - ${usuarioAtual.empresa}`;
+                    console.log('✅ Usuário carregado:', usuarioAtual.nome);
                     return;
                 }
-                
-                if (data) {
-                    usuarioAtual = data;
-                    document.getElementById('userLocation').textContent = 
-                        `${data.nome} - ${data.setor} - ${data.empresa}`;
-                    console.log('✅ Usuário carregado:', data.nome);
+
+                console.warn('⚠️ Usuário específico não encontrado, buscando primeiro usuário...');
+
+                const { data: usuarios, error: error2 } = await supabaseClient
+                    .from('usuarios')
+                    .select('*')
+                    .limit(1);
+
+                if (error2) {
+                    throw new Error('Não foi possível conectar ao banco de dados. Verifique se as tabelas foram criadas.');
+                }
+
+                if (usuarios && usuarios.length > 0) {
+                    usuarioAtual = usuarios[0];
+                    document.getElementById('userLocation').textContent =
+                        `${usuarios[0].nome} - ${usuarios[0].setor} - ${usuarios[0].empresa}`;
+                    console.log('✅ Usando primeiro usuário:', usuarios[0].nome);
+                } else {
+                    throw new Error('Nenhum usuário encontrado. Execute o script SQL primeiro.');
                 }
             } catch (error) {
                 console.error('❌ Erro ao carregar usuário:', error);
-                document.getElementById('userLocation').innerHTML = 
+                document.getElementById('userLocation').innerHTML =
                     `<span style="color: #f44336;">⚠️ ${error.message}</span>`;
             }
+        }
+
+        async function buscarPontoPorUsuarioData(data, campos = '*') {
+            const { data: registros, error } = await supabaseClient
+                .from('pontos')
+                .select(campos)
+                .eq('usuario_id', usuarioAtual.id)
+                .eq('data', data)
+                .order('updated_at', { ascending: false })
+                .limit(1);
+
+            if (error) {
+                throw error;
+            }
+
+            return registros && registros.length > 0 ? registros[0] : null;
+        }
+
+        async function buscarPontoPorId(pontoId) {
+            const { data: registros, error } = await supabaseClient
+                .from('pontos')
+                .select('*')
+                .eq('id', pontoId)
+                .limit(1);
+
+            if (error) {
+                throw error;
+            }
+
+            return registros && registros.length > 0 ? registros[0] : null;
         }
 
         function atualizarRelogio() {
@@ -1333,16 +1365,7 @@
                 const agora = new Date();
                 const horaAtual = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
 
-                const { data: pontoExistente, error: erroBuscaPonto } = await supabaseClient
-                    .from('pontos')
-                    .select('*')
-                    .eq('usuario_id', usuarioAtual.id)
-                    .eq('data', data)
-                    .maybeSingle();
-
-                if (erroBuscaPonto) {
-                    throw erroBuscaPonto;
-                }
+                const pontoExistente = await buscarPontoPorUsuarioData(data);
 
                 let pontoData = {
                     usuario_id: usuarioAtual.id,
@@ -1412,14 +1435,7 @@
             try {
                 const data = document.getElementById('selectedDate').value;
                 
-                const { data: ponto, error } = await supabaseClient
-                    .from('pontos')
-                    .select('*')
-                    .eq('usuario_id', usuarioAtual.id)
-                    .eq('data', data)
-                    .single();
-
-                if (error && error.code !== 'PGRST116') throw error;
+                const ponto = await buscarPontoPorUsuarioData(data);
 
                 const container = document.getElementById('todayPoints');
                 
@@ -1516,13 +1532,7 @@
             pontoEditandoId = pontoId;
             
             try {
-                const { data: ponto, error } = await supabaseClient
-                    .from('pontos')
-                    .select('*')
-                    .eq('id', pontoId)
-                    .single();
-
-                if (error) throw error;
+                const ponto = await buscarPontoPorId(pontoId);
 
                 if (ponto) {
                     document.getElementById('editModalDate').textContent = formatarData(ponto.data);
@@ -1649,12 +1659,7 @@
                     return;
                 }
 
-                const { data: existente } = await supabaseClient
-                    .from('pontos')
-                    .select('id')
-                    .eq('usuario_id', usuarioAtual.id)
-                    .eq('data', data)
-                    .single();
+                const existente = await buscarPontoPorUsuarioData(data, 'id');
 
                 if (existente) {
                     if (!confirm('Já existe um ponto registrado nesta data. Deseja substituir?')) {
