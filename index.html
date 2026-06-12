@@ -185,6 +185,23 @@
             padding: 10px;
         }
 
+        /* Correção para toque no Chrome mobile */
+        .register-btn,
+        .register-btn * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .register-btn:before,
+        .register-btn span {
+            pointer-events: none;
+        }
+
+        .register-btn:disabled {
+            opacity: 0.75;
+            cursor: wait;
+        }
+
         /* Botão de falta/atestado - REDONDO */
         .falta-btn {
             background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
@@ -892,11 +909,11 @@
             </div>
 
             <div class="register-button-container">
-                <button class="register-btn" onclick="registrarPonto()">
+                <button type="button" id="registrarPontoBtn" class="register-btn" onclick="registrarPonto(event)">
                     <span>REGISTRAR<br>PONTO</span>
                 </button>
                 
-                <button class="register-btn falta-btn" onclick="abrirModalFalta()">
+                <button type="button" class="register-btn falta-btn" onclick="abrirModalFalta()">
                     <span>LANÇAR<br>FALTA/<br>ATESTADO</span>
                 </button>
             </div>
@@ -1281,13 +1298,28 @@
         // ========================================
         // REGISTRAR PONTO
         // ========================================
-        async function registrarPonto() {
+        async function registrarPonto(event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            const botaoRegistrar = document.getElementById('registrarPontoBtn');
+
+            if (botaoRegistrar && botaoRegistrar.disabled) {
+                return;
+            }
+
             if (!usuarioAtual || !supabaseClient) {
                 alert('Sistema não está pronto. Verifique as configurações.');
                 return;
             }
 
             try {
+                if (botaoRegistrar) {
+                    botaoRegistrar.disabled = true;
+                    botaoRegistrar.setAttribute('aria-busy', 'true');
+                }
                 const data = document.getElementById('selectedDate').value;
                 if (!data) {
                     alert('Selecione uma data!');
@@ -1301,12 +1333,16 @@
                 const agora = new Date();
                 const horaAtual = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
 
-                const { data: pontoExistente } = await supabaseClient
+                const { data: pontoExistente, error: erroBuscaPonto } = await supabaseClient
                     .from('pontos')
                     .select('*')
                     .eq('usuario_id', usuarioAtual.id)
                     .eq('data', data)
-                    .single();
+                    .maybeSingle();
+
+                if (erroBuscaPonto) {
+                    throw erroBuscaPonto;
+                }
 
                 let pontoData = {
                     usuario_id: usuarioAtual.id,
@@ -1357,11 +1393,16 @@
                 }
 
                 if (result.error) throw result.error;
-                
+
                 await carregarPontosDeHoje();
             } catch (error) {
                 console.error('Erro ao registrar ponto:', error);
                 alert('Erro ao registrar ponto: ' + error.message);
+            } finally {
+                if (botaoRegistrar) {
+                    botaoRegistrar.disabled = false;
+                    botaoRegistrar.removeAttribute('aria-busy');
+                }
             }
         }
 
@@ -2143,8 +2184,26 @@
             return dataHoraBrasilia.toISOString();
         }
 
-        // Inicia a aplicação quando a página carrega
-        window.onload = init;
+        // Deixa as funções acessíveis para os onclick inline em navegadores móveis
+        window.registrarPonto = registrarPonto;
+        window.abrirModalFalta = abrirModalFalta;
+        window.salvarFaltaModal = salvarFaltaModal;
+        window.fecharModalFalta = fecharModalFalta;
+        window.switchScreen = switchScreen;
+        window.gerarRelatorio = gerarRelatorio;
+        window.visualizarPDF = visualizarPDF;
+        window.exportarPDF = exportarPDF;
+        window.abrirModalEdicao = abrirModalEdicao;
+        window.salvarEdicao = salvarEdicao;
+        window.excluirPonto = excluirPonto;
+        window.fecharModal = fecharModal;
+
+        // Inicia a aplicação quando o DOM estiver pronto
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
     </script>
 </body>
 </html>
