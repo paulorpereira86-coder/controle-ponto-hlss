@@ -1113,6 +1113,10 @@
         const CARGA_PADRAO_ANTES_01032026 = 8 * 60;
         const CARGA_PADRAO_APOS_01032026 = 5 * 60;
         const TOLERANCIA_MINUTOS = 10;
+        const CAMPOS_HORARIOS = [
+            'entrada1', 'saida1', 'entrada2', 'saida2',
+            'entrada3', 'saida3', 'entrada4', 'saida4'
+        ];
 
         function obterCargaPadraoPorData(data) {
             if (data && data >= DATA_INICIO_CARGA_5H) {
@@ -1489,7 +1493,8 @@
                                 <div style="color: #ccc; font-size: 0.85em;">Observação: ${ponto.observacao}</div>
                             </div>
                             <div class="point-actions">
-                                <button class="icon-btn" onclick="abrirModalEdicao('${ponto.id}')">✏️</button>
+                                <button class="icon-btn" type="button" onclick="abrirModalEdicao('${ponto.id}')">✏️</button>
+                                <button class="icon-btn" type="button" onclick="excluirPontoDoDia('${ponto.id}')">🗑️</button>
                             </div>
                         </div>
                     `;
@@ -1505,7 +1510,8 @@
                                         <div style="font-size: 0.75em; color: #999; margin-top: 3px;">Carga considerada: ${textoCargaHoraria(cargaDia)}</div>
                                     </div>
                                     <div class="point-actions">
-                                        <button class="icon-btn" onclick="abrirModalEdicao('${ponto.id}')">✏️</button>
+                                        <button class="icon-btn" type="button" onclick="abrirModalEdicao('${ponto.id}')">✏️</button>
+                                        <button class="icon-btn" type="button" onclick="excluirHorarioPonto('${ponto.id}', '${p.campo}')">🗑️</button>
                                     </div>
                                 </div>
                             `;
@@ -1588,19 +1594,87 @@
             }
         }
 
+        async function excluirRegistroPontoPorId(pontoId) {
+            const { data: removidos, error } = await supabaseClient
+                .from('pontos')
+                .delete()
+                .eq('id', pontoId)
+                .select('id');
+
+            if (error) throw error;
+
+            if (!removidos || removidos.length === 0) {
+                throw new Error('Nenhum registro foi excluído. Recarregue a página e tente novamente.');
+            }
+
+            return removidos[0];
+        }
+
+        async function excluirPontoDoDia(pontoId) {
+            if (!pontoId) return;
+            if (!confirm('Deseja realmente excluir todos os pontos deste dia?')) return;
+
+            try {
+                await excluirRegistroPontoPorId(pontoId);
+                await carregarPontosDeHoje();
+            } catch (error) {
+                console.error('Erro ao excluir ponto do dia:', error);
+                alert('Erro ao excluir: ' + error.message);
+            }
+        }
+
+        async function excluirHorarioPonto(pontoId, campo) {
+            if (!pontoId || !campo || !CAMPOS_HORARIOS.includes(campo)) return;
+
+            if (!confirm('Deseja realmente excluir este horário registrado?')) return;
+
+            try {
+                const ponto = await buscarPontoPorId(pontoId);
+
+                if (!ponto) {
+                    throw new Error('Registro não encontrado. Recarregue a página e tente novamente.');
+                }
+
+                const isFalta = ponto.observacao && ponto.observacao.toUpperCase().startsWith('FALTA');
+                const isAtestado = ponto.observacao && ponto.observacao.toUpperCase().startsWith('ATESTADO');
+
+                if (isFalta || isAtestado) {
+                    await excluirRegistroPontoPorId(pontoId);
+                    await carregarPontosDeHoje();
+                    return;
+                }
+
+                const proximoPonto = { ...ponto, [campo]: null };
+                const aindaTemHorario = CAMPOS_HORARIOS.some(c => proximoPonto[c]);
+
+                if (!aindaTemHorario) {
+                    await excluirRegistroPontoPorId(pontoId);
+                } else {
+                    const { error } = await supabaseClient
+                        .from('pontos')
+                        .update({
+                            [campo]: null,
+                            updated_at: getTimestampBrasilia()
+                        })
+                        .eq('id', pontoId);
+
+                    if (error) throw error;
+                }
+
+                await carregarPontosDeHoje();
+            } catch (error) {
+                console.error('Erro ao excluir horário:', error);
+                alert('Erro ao excluir: ' + error.message);
+            }
+        }
+
         async function excluirPonto() {
             if (!pontoEditandoId) return;
             
-            if (!confirm('Deseja realmente excluir este ponto?')) return;
+            if (!confirm('Deseja realmente excluir todos os pontos deste dia?')) return;
 
             try {
-                const { error } = await supabaseClient
-                    .from('pontos')
-                    .delete()
-                    .eq('id', pontoEditandoId);
-
-                if (error) throw error;
-
+                await excluirRegistroPontoPorId(pontoEditandoId);
                 fecharModal();
                 await carregarPontosDeHoje();
             } catch (error) {
@@ -2201,6 +2275,8 @@
         window.abrirModalEdicao = abrirModalEdicao;
         window.salvarEdicao = salvarEdicao;
         window.excluirPonto = excluirPonto;
+        window.excluirPontoDoDia = excluirPontoDoDia;
+        window.excluirHorarioPonto = excluirHorarioPonto;
         window.fecharModal = fecharModal;
 
         // Inicia a aplicação quando o DOM estiver pronto
