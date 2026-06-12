@@ -1106,6 +1106,7 @@
         let usuarioAtual = null;
         let pontoEditandoId = null;
         let dadosRelatorio = null;
+        let pontoAtualSelecionado = null;
 
         // Cargas horárias em minutos
         // 240 = 4h | 300 = 5h | 360 = 6h | 480 = 8h
@@ -1153,6 +1154,36 @@
             return `${String(novaHora).padStart(2, '0')}:${String(novoMinuto).padStart(2, '0')}`;
         }
 
+        function obterDataHojeLocal() {
+            const hoje = new Date();
+            const ano = hoje.getFullYear();
+            const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+            const dia = String(hoje.getDate()).padStart(2, '0');
+
+            return `${ano}-${mes}-${dia}`;
+        }
+
+        function obterHoraAtualHHMM() {
+            const agora = new Date();
+            const horas = String(agora.getHours()).padStart(2, '0');
+            const minutos = String(agora.getMinutes()).padStart(2, '0');
+
+            return `${horas}:${minutos}`;
+        }
+
+        function possuiEntradaAberta(ponto) {
+            if (!ponto) return false;
+
+            const pares = [
+                ['entrada1', 'saida1'],
+                ['entrada2', 'saida2'],
+                ['entrada3', 'saida3'],
+                ['entrada4', 'saida4']
+            ];
+
+            return pares.some(([entrada, saida]) => ponto[entrada] && !ponto[saida]);
+        }
+
         // ========================================
         // INICIALIZAÇÃO
         // ========================================
@@ -1162,7 +1193,10 @@
             try {
                 // Inicia o relógio PRIMEIRO (independente do Supabase)
                 atualizarRelogio();
-                setInterval(atualizarRelogio, 1000);
+                setInterval(() => {
+                    atualizarRelogio();
+                    atualizarHorasTrabalhadasDinamicas();
+                }, 1000);
                 console.log('✅ Relógio iniciado');
                 
                 // Tenta conectar ao Supabase
@@ -1440,6 +1474,7 @@
                 const data = document.getElementById('selectedDate').value;
                 
                 const ponto = await buscarPontoPorUsuarioData(data);
+                pontoAtualSelecionado = ponto || null;
 
                 const container = document.getElementById('todayPoints');
                 
@@ -1458,7 +1493,7 @@
                 const cargaDia = obterCargaHorariaMinutos(ponto);
                 document.getElementById('cargaHorariaDia').value = cargaDia;
 
-                const totalMinutos = calcularMinutosTrabalhados(ponto);
+                const totalMinutos = calcularMinutosTrabalhadosAteAgora(ponto);
                 document.getElementById('hoursWorked').textContent = minutosParaHoras(totalMinutos);
 
                 let html = '';
@@ -1475,6 +1510,26 @@
 
                 const isFalta = ponto.observacao && ponto.observacao.toUpperCase().startsWith('FALTA');
                 const isAtestado = ponto.observacao && ponto.observacao.toUpperCase().startsWith('ATESTADO');
+
+                if (!isFalta && !isAtestado) {
+                    const dataHojeLocal = obterDataHojeLocal();
+                    const temPontoAberto = data === dataHojeLocal && possuiEntradaAberta(ponto);
+                    const tituloHorasConsulta = data === dataHojeLocal ? 'Horas trabalhadas até agora' : 'Horas trabalhadas no dia';
+                    const detalheHorasConsulta = temPontoAberto
+                        ? 'Contando o ponto em aberto até este momento'
+                        : 'Considerando os horários já fechados';
+
+                    html += `
+                        <div class="point-item" style="border: 2px solid #FF6B35; background: rgba(255, 107, 53, 0.08);">
+                            <div class="point-check" style="color: #FF6B35; font-size: 2em;">⏱️</div>
+                            <div class="point-info">
+                                <div class="point-type" style="color: #FF6B35; font-size: 1em;">${tituloHorasConsulta}</div>
+                                <div class="point-time" id="workedNowCardValue" style="font-size: 1.6em; font-weight: bold; color: #FF6B35; margin-top: 4px;">${minutosParaHoras(totalMinutos)}</div>
+                                <div id="workedNowCardDetail" style="font-size: 0.75em; color: #999; margin-top: 4px;">${detalheHorasConsulta}</div>
+                            </div>
+                        </div>
+                    `;
+                }
 
                 if (isFalta || isAtestado) {
                     const cor = isFalta ? '#f44336' : '#4CAF50';
@@ -1814,14 +1869,13 @@
 
                 if (errorPontos) throw errorPontos;
 
-                const hoje = new Date();
-                const dataHoje = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+                const dataLimiteBancoHoras = dataFim;
                 
                 const { data: todosPontos, error: errorTodosPontos } = await supabaseClient
                     .from('pontos')
                     .select('*')
                     .eq('usuario_id', usuarioAtual.id)
-                    .lte('data', dataHoje)
+                    .lte('data', dataLimiteBancoHoras)
                     .order('data', { ascending: true });
 
                 if (errorTodosPontos) throw errorTodosPontos;
@@ -1922,7 +1976,7 @@
                                 ${bancoHorasAcumulado >= 0 ? '✅ Você tem crédito de horas' : '⚠️ Você está devendo horas'}
                             </div>
                             <div class="banco-horas-calc">
-                                Total desde o início até hoje (${formatarData(dataHoje)})
+                                Total desde o início até ${formatarData(dataLimiteBancoHoras)}
                             </div>
                             <div class="banco-horas-calc">
                                 Extras Totais: ${minutosParaHoras(bancoHorasExtras)} | Devendo Total: ${minutosParaHoras(bancoHorasDevendo)}
@@ -2216,6 +2270,51 @@
             }
             
             return total;
+        }
+
+        function calcularMinutosTrabalhadosAteAgora(ponto) {
+            if (!ponto) return 0;
+
+            const isFalta = ponto.observacao && ponto.observacao.toUpperCase().startsWith('FALTA');
+            const isAtestado = ponto.observacao && ponto.observacao.toUpperCase().startsWith('ATESTADO');
+
+            if (isFalta || isAtestado || ponto.data !== obterDataHojeLocal()) {
+                return calcularMinutosTrabalhados(ponto);
+            }
+
+            let total = calcularMinutosTrabalhados(ponto);
+            const horaAtual = obterHoraAtualHHMM();
+            const pares = [
+                ['entrada1', 'saida1'],
+                ['entrada2', 'saida2'],
+                ['entrada3', 'saida3'],
+                ['entrada4', 'saida4']
+            ];
+
+            pares.forEach(([entrada, saida]) => {
+                if (ponto[entrada] && !ponto[saida]) {
+                    total += Math.max(0, calcularDiferencaMinutos(ponto[entrada], horaAtual));
+                }
+            });
+
+            return total;
+        }
+
+        function atualizarHorasTrabalhadasDinamicas() {
+            if (!pontoAtualSelecionado) return;
+
+            const minutos = calcularMinutosTrabalhadosAteAgora(pontoAtualSelecionado);
+            const textoHoras = minutosParaHoras(minutos);
+            const hoursWorked = document.getElementById('hoursWorked');
+            const workedNowCardValue = document.getElementById('workedNowCardValue');
+
+            if (hoursWorked) {
+                hoursWorked.textContent = textoHoras;
+            }
+
+            if (workedNowCardValue) {
+                workedNowCardValue.textContent = textoHoras;
+            }
         }
 
         function calcularMinutosParaBanco(minutosTrabalhados, ponto) {
